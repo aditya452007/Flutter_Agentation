@@ -45,25 +45,30 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
   void _showHistorySheet() {
     showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Colors.black,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) => ValueListenableBuilder(
         valueListenable: _controller.history.entries,
         builder: (context, entries, _) {
           if (entries.isEmpty) {
-            return const Padding(padding: EdgeInsets.all(24), child: Text('No annotations yet. Tap a widget while inspecting.'));
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('No annotations yet. Tap a widget while inspecting.', style: TextStyle(color: Colors.white)),
+            );
           }
           return ListView.separated(
             padding: const EdgeInsets.all(12),
             itemCount: entries.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, __) => const Divider(height: 1, color: Colors.white24),
             itemBuilder: (context, index) {
               final e = entries[index];
               return ListTile(
                 dense: true,
-                leading: CircleAvatar(radius: 14, child: Text('${e.id}', style: const TextStyle(fontSize: 12))),
-                title: Text(e.facts.widgetType, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                subtitle: Text(e.note, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                leading: CircleAvatar(radius: 14, backgroundColor: Colors.white, child: Text('${e.id}', style: const TextStyle(fontSize: 12, color: Colors.black))),
+                title: Text(e.facts.widgetType, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                subtitle: Text(e.note, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.white70)),
                 trailing: IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 18),
+                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
                   onPressed: () => _controller.removeEntry(e.id),
                   tooltip: 'Delete',
                 ),
@@ -114,7 +119,7 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
             child: widget.child,
           ),
         ),
-        // Hover border — solid primary 1.5px + badge, distinct from selected (translucent fill)
+        // Hover border — indigo/blue 1.5px solid + badge (more visible per reference docs)
         if (isEnabled && isVisible && !isPaused && hovered != null && hovered.bounds != null && hovered.element != selected?.element)
           Positioned(
             left: hovered.bounds!.x,
@@ -127,9 +132,9 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.6), width: 1.5),
+                      border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
                       borderRadius: BorderRadius.circular(6),
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
+                      color: const Color(0xFF3B82F6).withOpacity(0.08),
                     ),
                   ),
                   Positioned(
@@ -138,12 +143,12 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                        color: const Color(0xFF3B82F6),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         hovered.facts.widgetType,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontSize: 10),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -204,12 +209,22 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
             },
           );
 
+    // Pill is not draggable (buttons must not be mistaken for drag) — only circle is draggable
+    if (isExpanded) {
+      return Positioned(
+        right: 24,
+        bottom: 24,
+        child: SafeArea(child: toggle),
+      );
+    }
+
     if (_dragOffset == null) {
       return Positioned(
-        right: 16,
-        bottom: 16,
+        right: 24,
+        bottom: 24,
         child: SafeArea(
           child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
             onPanUpdate: (details) {
               setState(() {
                 _dragOffset = details.globalPosition - const Offset(20, 20);
@@ -225,6 +240,7 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
       left: _dragOffset!.dx,
       top: _dragOffset!.dy,
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
         onPanUpdate: (details) {
           setState(() {
             _dragOffset = _dragOffset! + details.delta;

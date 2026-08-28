@@ -27,17 +27,16 @@ class PillToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: scheme.surfaceContainerHigh,
-      elevation: 6,
-      shadowColor: Colors.black26,
+      color: Colors.black,
+      elevation: 8,
+      shadowColor: Colors.black54,
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Logo + collapse
+          // Logo + collapse — drag handle
           InkWell(
             onTap: onCollapse,
             child: Padding(
@@ -45,11 +44,11 @@ class PillToolbar extends StatelessWidget {
               child: Container(
                 width: 28,
                 height: 28,
-                decoration: BoxDecoration(
-                  color: scheme.primary,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.smart_toy_outlined, size: 16, color: Colors.white),
+                child: const Icon(Icons.smart_toy_outlined, size: 16, color: Colors.black),
               ),
             ),
           ),
@@ -67,19 +66,19 @@ class PillToolbar extends StatelessWidget {
             enabled: count > 0,
             onTap: onClear,
           ),
-          Container(width: 1, height: 24, color: scheme.outlineVariant, margin: const EdgeInsets.symmetric(horizontal: 4)),
+          Container(width: 1, height: 24, color: Colors.white24, margin: const EdgeInsets.symmetric(horizontal: 4)),
           IconButton(
             tooltip: isPaused ? 'Resume' : 'Pause',
-            icon: Icon(isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 18),
+            icon: Icon(isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 18, color: Colors.white),
             onPressed: onTogglePause,
             style: IconButton.styleFrom(
-              backgroundColor: isPaused ? scheme.primaryContainer : null,
-              foregroundColor: isPaused ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+              backgroundColor: isPaused ? Colors.white : Colors.transparent,
+              foregroundColor: isPaused ? Colors.black : Colors.white,
             ),
           ),
           IconButton(
             tooltip: isVisible ? 'Hide markers' : 'Show markers',
-            icon: Icon(isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 18),
+            icon: Icon(isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 18, color: Colors.white),
             onPressed: onToggleVisibility,
           ),
           IconButton(
@@ -87,14 +86,16 @@ class PillToolbar extends StatelessWidget {
             icon: Badge(
               label: count > 0 ? Text('$count') : null,
               isLabelVisible: count > 0,
-              child: const Icon(Icons.history_rounded, size: 18),
+              backgroundColor: Colors.white,
+              textColor: Colors.black,
+              child: const Icon(Icons.history_rounded, size: 18, color: Colors.white),
             ),
             onPressed: onHistory,
           ),
           const SizedBox(width: 4),
           IconButton(
             tooltip: 'Collapse',
-            icon: const Icon(Icons.close_rounded, size: 18),
+            icon: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
             onPressed: onCollapse,
           ),
           const SizedBox(width: 6),
@@ -113,7 +114,6 @@ class _PillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Opacity(
       opacity: enabled ? 1 : 0.4,
       child: InkWell(
@@ -124,9 +124,9 @@ class _PillButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+              Icon(icon, size: 14, color: Colors.white),
               const SizedBox(width: 4),
-              Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+              Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
             ],
           ),
         ),

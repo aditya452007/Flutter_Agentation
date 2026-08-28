@@ -6,127 +6,149 @@
 
 ## Overview
 
-Flutter Agentation is a **local, on-device inspector** embedded in a Flutter app. Developer activates inspection, points at a widget (hit-test), the tool resolves `Element/Widget/RenderObject + source + bounds + hierarchy`, the developer adds a note, and the **Context Exporter** produces deterministic Markdown (and internal JSON) that is copied to the clipboard for an external AI agent. V2 (visual overrides) and V3 (MCP adapter) **share the same ContextModel** — they are not second inspection implementations.
+Flutter Agentation is a **local, on-device inspector** embedded in a Flutter app via `MaterialApp(builder: AgentationOverlay)`. Entry is a **40dp black circle with white logo + badge** at bottom-right (like Next.js `agentation.com` circle), which **morphs to a black pill toolbar** (`Copy(n)/Clear/Pause/Visibility/History`) on tap. While inspecting, **hover** (desktop/web `MouseRegion`) shows a **blue/indigo 1.5px border + name badge** for the smallest-area `RenderBox` under cursor, so background vs `Card` vs `Button` is instantly distinguishable. **Click** shows only a **black popup `Say what to change…` input + Add/Cancel** anchored to the selection rect — full `Widget/Source/Geometry/Hierarchy` is only in the **copied Markdown**. Multiple annotations form a **history list** (reindex 1..n, delete per row, `Copy all`).
 
-Core loop (V1): **Activate → Select → Inspect → Annotate → Export (Markdown) → Copy → External Agent** — `spec.md:16-33`, `problem-statement.md:48-69`.
+Core loop (V1+R10): **Circle → Pill → Hover (blue) → Select → Popup (black input) → Add to History → Copy All → External Agent** — `spec.md:16-33` + `Feature_docs/R10-circle-hover-history/spec.md:1`.
 
 ---
 
-## Architecture Diagram (pipeline)
+## Architecture Diagram (pipeline — R10)
 
 ```mermaid
 graph TD
-    subgraph App["Flutter Application (host)"]
-        UI[App UI - widgets]
-        Overlay[Agenation Overlay / UI<br/>activation + selection visuals + panel]
+    subgraph App["Flutter App (host) — MaterialApp(builder: AgentationOverlay)"]
+        UI[App UI]
+        Trigger[Circle 40dp black/white badge]
+        Pill[Pill black/white Copy/Clear/Pause/Visibility/History]
+        Hover[Hover border blue]
+        Sel[Selected highlight primary]
+        Popup[FeedbackPopup black input]
+        History[History sheet black]
     end
     subgraph Pipeline["Agenation Pipeline"]
-        SE[Selection Engine<br/>hit testing / coordinates]
-        WR[Widget Resolver<br/>Element / Widget / RenderObject]
-        CC[Context Collector<br/>normalized ContextModel]
-        AM[Annotation Manager<br/>text note V1]
-        EX[Context Exporter<br/>Markdown / JSON]
+        SE[SelectionEngine<br/>smallest-area + _isLeafText lift]
+        HE[HoverEngine<br/>hoverAt() → hovered notifier]
+        WR[WidgetResolver<br/>_location → lib/ normalize + hierarchy filter]
+        HM[AnnotationHistory<br/>add/remove/clear reindex]
+        EX[MarkdownExporter<br/>export / exportAll]
         CB[Clipboard]
-        SS[Screenshot Service<br/>optional]
     end
-    subgraph External["Outside the package"]
-        DEV[External AI Agent<br/>Claude / Codex / Cursor]
-        VCS[(Git - source history)]
+    subgraph External["Outside"]
+        DEV[External AI Agent]
+        VCS[(Git)]
     end
-    UI --> Overlay
-    Overlay --> SE --> WR --> CC --> AM --> EX --> CB --> DEV
-    CC --> SS
-    EX -. future .-> DEV
-    CC -. future V2 .-> OV[Visual Overrides]
-    CC -. future V3 .-> MCP[MCP Server]
+    UI --> Trigger --> Pill
+    Pill --> SE
+    SE --> WR
+    WR --> HM
+    HM --> EX --> CB --> DEV
+    HE -.-> Hover
+    SE -.-> Sel
+    SE -.-> Popup
+    Pill -.-> History
     DEV --> VCS
-
-    classDef v2 fill:#334155,stroke:#94a3b8,stroke-dasharray: 6 4,color:#e2e8f0
-    class OV,MCP v2
+    classDef v2 fill:#111,stroke:#fff,color:#fff
+    class Trigger,Pill,Popup,History v2
 ```
 
-Dependency / layer map (`stack-mobile` + `architecture.md:34-38`):
-
-```text
-Overlay → SelectionEngine → WidgetResolver → ContextCollector → AnnotationManager → ContextExporter
-                                     ↓
-                         ContextModel (facts vs intent vs visual)
-                             /           \
-                        Markdown         MCP adapter (V3)
-```
-
-**Invariant**: one ContextModel, two adapters — `architecture.md:83-311`.
+Dependency: `Overlay (Circle/Pill/Hover/Popup) → SelectionEngine (selectAt/hoverAt) → WidgetResolver → AnnotationHistory → MarkdownExporter` → single `ContextModel` (`facts` vs `intent` vs `visual` stub).
 
 ---
 
 ## User Flows
 
-### Flow: Primary — Inspect and export (V1 happy path)
-
-**Goal**: produce agent-usable context for a visual tweak.
+### Flow: Circle → Pill (entry)
 
 ```mermaid
 flowchart LR
-    A([Developer runs app]) --> B[Activates Agentation]
-    B --> C[Taps / points at widget]
-    C --> D[Selection overlay appears<br/>bounds highlight]
-    D --> E[Panel shows<br/>type / source / bounds / hierarchy]
-    E --> F[Developer types feedback<br/>e.g. 'Make more rounded']
-    F --> G[Exporter generates Markdown]
-    G --> H[Copy to clipboard]
-    H --> I[Pastes into external agent chat]
-    I --> J[External agent edits source<br/>developer reviews diff]
-    style H fill:#0ea5e9,stroke:#0c4a6e,color:#fff
+    A([App start]) --> B[Circle 40dp black/white bottom-right]
+    B --> C{Tapped?}
+    C -- yes --> D[Pill expands 40→240 220ms<br/>Copy(0) Clear Pause Visibility History]
+    C -- drag --> E[Drag circle, auto-dock 12px peek]
+    D --> F[Inspect enabled]
+    F --> G[Hover shows blue border]
 ```
 
-### Flow: Source unavailable (graceful degradation)
+Like `agentation.com` bottom-right circle → toolbar, and `zero_inspector_kit` auto-dock peek. `PillToolbar` is `Colors.black` with `Colors.white` icons for contrast (ADR-017).
 
-**Goal**: still useful when file:line is missing.
+### Flow: Hover to Identify (desktop/web)
 
 ```mermaid
 flowchart LR
-    A([Select widget]) --> B{Source location<br/>available?}
-    B -- yes --> C[Show file:line:col<br/>include in Markdown]
-    B -- no --> D[Show 'Source unavailable<br/>in this build'<br/>still show bounds/hierarchy]
-    C --> E[Generate Markdown]
-    D --> E
-    E --> F[Copy]
+    A([Inspect on]) --> B[Mouse moves]
+    B --> C{Smallest-area RenderBox<br/>containing offset?}
+    C -- yes --> D[Hover border blue #3B82F6 1.5px<br/>badge widgetType]
+    C -- no --> E[Clear hover]
+    D --> F{Move to Button<br/>inside Card?}
+    F -- Card 200×200 vs Button 120×60 --> G[Button wins (smaller area)]
+    F -- Text leaf 80×20 inside Button --> H[Lift to Button ancestor]
 ```
 
-Per `spec.md:FR-005`, `architecture.md:39-55`, `decision.md:ADR-009`.
+`lib/src/selection/selection_engine.dart:9` `hoverAt()` + `MouseRegion.onHover` (`agentation_overlay.dart:106`), not `Listener.onPointerDown` only. Filter `_` private, choose smallest `width*height`.
 
-### Flow: Screenshot optional
+### Flow: Select → Minimal Popup (not full panel)
 
 ```mermaid
 flowchart LR
-    A([Context ready]) --> B{Screenshot<br/>available?}
-    B -- yes --> C[Attach visual evidence<br/>to Markdown]
-    B -- no --> D[Export without screenshot<br/>do not block]
+    A([Hovering Button]) --> B[Click]
+    B --> C[SelectionHighlight solid primary]
+    C --> D[FeedbackPopup black<br/>300×120 anchored to rect<br/>Say what to change… + Add/Cancel]
+    D --> E{Enter or Add?}
+    E -- text entered --> F[Add → history entry 1<br/>marker 1 on widget<br/>popup closes]
+    E -- Cancel --> G[Clear pending, no history]
+    F --> H[Copy (1) badge updates]
+```
+
+Only input is shown on click; hierarchy/source only in Markdown (`Feature_docs/R10` FR-004). Popup flips above selection if near bottom edge (`_popupTop`).
+
+### Flow: History Multi + Delete
+
+```mermaid
+flowchart LR
+    A([2 annotations]) --> B[Taps History in pill]
+    B --> C[Bottom sheet black<br/>1 ElevatedButton: Make rounded<br/>2 Card: more padding]
+    C --> D{Delete 1?}
+    D -- yes --> E[Reindex: 2→1, marker 1 removed]
+    D -- Clear --> F[History empty, Copy(0) disabled]
+    E --> G[Copy (1) → Markdown with ## Annotation 1 only]
+```
+
+`lib/src/annotation/annotation_history.dart:1` `ValueNotifier<List<AnnotationEntry>>` `add/remove/clear` reindex, `MarkdownExporter.exportAll()` writes `## Annotation n` per entry.
+
+### Flow: Source unavailable (graceful)
+
+```mermaid
+flowchart LR
+    A([Select widget]) --> B{Source _location<br/>available?}
+    B -- yes --> C[Show lib/...:line:col<br/>include in Markdown]
+    B -- no --> D[Show 'Source unavailable'<br/>still show bounds/hierarchy]
     C --> E[Copy]
     D --> E
 ```
 
-Per `spec.md:FR-009`.
+`lib/src/resolver/source_resolver.dart:17` reads `Element._location` via dynamic + normalizes `file://` → `lib/` to avoid absolute leak (ADR-016).
 
-### Flow: V2 deferred (shown for seam only — not implemented)
+### Flow: Copy All
 
 ```mermaid
-flowchart LR
-    A([Selected widget]) --> B[Apply temporary<br/>visual override<br/>e.g. width 120→160]
-    B --> C[Overlay renders modified result]
-    C --> D[OverrideState serialized<br/>as change description]
-    D --> E[Export includes<br/>facts + intent]
-    style B fill:#334155,stroke:#94a3b8,stroke-dasharray: 6 4,color:#e2e8f0
-    style D fill:#334155,stroke:#94a3b8,stroke-dasharray: 6 4,color:#e2e8f0
+sequenceDiagram
+    participant U as Developer
+    participant P as PillToolbar
+    participant H as History
+    participant E as MarkdownExporter
+    participant C as Clipboard
+    U->>P: tap Copy (n)
+    P->>H: toContextModels()
+    H->>E: exportAll(models)
+    E->>C: Clipboard.setData(allMarkdown)
+    C->>U: SnackBar Copied n annotation(s)
 ```
-
-Not in V1 — see `decisions.md:Decision 005/006`.
 
 ---
 
 ## Request / Response Flows
 
-### 1. Selection → Context (runtime, synchronous)
+### 1. Hover → Select → Popup → History
 
 ```mermaid
 sequenceDiagram
@@ -134,154 +156,136 @@ sequenceDiagram
     participant O as Overlay
     participant SE as SelectionEngine
     participant WR as WidgetResolver
-    participant CC as ContextCollector
-    participant AM as AnnotationManager
-    participant EX as Exporter
-
-    U->>O: enable inspection + tap at (x,y)
-    O->>SE: selectAt(Offset, BuildContext)
-    SE->>SE: RenderBox.hitTest / HitTestResult
-    SE->>WR: resolve(Element, RenderObject)
-    WR->>WR: extract widgetType/runtimeType/source?/bounds/hierarchy
-    WR-->>CC: WidgetInfo
-    CC->>CC: build ContextModel (facts + hierarchy + geometry)
-    CC->>AM: currentAnnotation?
-    AM-->>CC: DeveloperNote | none
-    CC->>EX: generate(ContextModel + Note + screenshot?)
-    EX-->>O: Markdown + Json
-    O-->>U: show panel + enable Copy
+    participant H as AnnotationHistory
+    participant P as FeedbackPopup
+    U->>O: move mouse to (x,y)
+    O->>SE: hoverAt(Offset)
+    SE->>WR: resolve(bestCandidate) — smallest-area
+    WR-->>SE: WidgetFacts (filtered hierarchy)
+    SE-->>O: hovered notifier → blue Hover border
+    U->>O: tap at (x,y)
+    O->>SE: selectAt(Offset)
+    SE-->>O: selected + pendingPopupFor
+    O->>P: show FeedbackPopup anchored
+    U->>P: type "Make more rounded" + Enter
+    P->>H: add(facts, note) → id=1
+    H-->>O: entries notifier → pill badge Copy(1), marker 1
 ```
 
-### 2. Copy → External agent (out of package)
+### 2. Copy → External agent
 
 ```mermaid
 sequenceDiagram
     participant U as Developer
-    participant O as Overlay
-    participant CB as Clipboard
+    participant P as PillToolbar
+    participant E as MarkdownExporter
+    participant C as Clipboard
     participant A as External AI Agent
-
-    U->>O: press Copy
-    O->>CB: Clipboard.setData(Markdown)
-    CB-->>O: success
-    O-->>U: toast copied
+    U->>P: tap Copy (2)
+    P->>E: exportAll([ctx1, ctx2])
+    E-->>P: Markdown with ## Annotation 1 + ## Annotation 2
+    P->>C: Clipboard.setData
+    C-->>P: success
+    P->>U: SnackBar Copied 2
     U->>A: paste Markdown
-    A->>A: locate file:line:column + apply edit
-    A-->>U: proposes diff (reviewed in Git)
+    A->>A: grep hierarchy + file:line + note
 ```
-
-No network call originates from the package (`spec.md:FR-012`).
-
-### 3. V3 MCP (deferred — same model)
-
-```mermaid
-sequenceDiagram
-    participant A as External AI Agent
-    participant M as MCP Server (V3)
-    participant CC as ContextCollector (same API)
-
-    A->>M: getSelectedWidget / getWidgetTree / getContext
-    M->>CC: getCurrentContext()
-    CC-->>M: ContextModel
-    M-->>A: JSON
-```
-
-`architecture.md:53-59` — MCP consumes the same internal APIs; no second inspector.
 
 ---
 
 ## Function Call Map
 
-### Package public surface
-
 ```text
 lib/agentation.dart (barrel)
-  └─ AgentationOverlay.wrap(child: MyApp)
-       ├─ AgentationController  (selection state + activation)
-       │    ├─ SelectionEngine.selectAt(offset)           (lib/src/selection/)
-       │    │    └─ RenderBox.hitTest / BoxHitTestResult
-       │    └─ WidgetResolver.resolve(element, renderObject) (lib/src/resolver/)
-       │         ├─ SourceResolver.location(element) → SourceLocation?
-       │         ├─ BoundsExtractor.rect(renderObject) → Rect?
-       │         └─ HierarchyExtractor.path(element) → List<ElementInfo>
-       ├─ ContextCollector.collect(selection, note)       (lib/src/context/)
-       │    └─ ContextModel {
-       │         facts: { widgetType, runtimeType, sourceLocation? (optional),
-       │                  bounds, hierarchy, text, key, semantics },
-       │         intent: { developerNote },
-       │         visual: { /* V2 stub: VisualOverrides */ }
-       │       }
-       ├─ AnnotationManager.note(value)                   (lib/src/annotation/)
-       ├─ MarkdownExporter.export(model) → String         (lib/src/exporter/markdown_exporter.dart)
-       │    └─ JsonExporter.toJson(model) → Map (internal / V3)
-       └─ Clipboard.copy(markdown)                        (lib/src/exporter/clipboard.dart)
+ └─ AgentationOverlay.wrap(child: MaterialApp.builder → child)  [example/lib/main.dart:11]
+      ├─ CircleToggle 40dp black/white badge (lib/src/overlay/circle_toggle.dart:1) — collapsed
+      │    └─ onTap → AgentationController.expand() + enable()
+      ├─ PillToolbar black/white (lib/src/overlay/pill_toolbar.dart:1) — expanded
+      │    ├─ Copy (n) → controller.exportAll() → MarkdownExporter.exportAll()
+      │    ├─ Clear → history.clear()
+      │    ├─ Pause/Visibility → isPaused/isVisible toggles (hover/selection gate)
+      │    ├─ History → showModalBottomSheet black sheet
+      │    └─ Close → collapse() + disable()
+      ├─ AgentationController (lib/src/overlay/agentation_controller.dart:11)
+      │    ├─ isEnabled / isExpanded / isPaused / isVisible (ValueNotifier<bool>)
+      │    ├─ selected / hovered / pendingPopupFor (ValueNotifier<SelectionResult?>)
+      │    ├─ history: AnnotationHistory (add/remove/clear reindex)
+      │    ├─ selectAt(Offset) → SelectionEngine.selectAt → pendingPopupFor
+      │    ├─ onHover(Offset) → SelectionEngine.hoverAt → hovered (blue border)
+      │    └─ currentContext / exportAll()
+      ├─ SelectionEngine (lib/src/selection/selection_engine.dart:9)
+      │    ├─ hoverAt(Offset) → _bestCandidate(smallest-area) → hovered
+      │    ├─ selectAt(Offset) → _bestCandidate → selected + _isLeafText lift
+      │    └─ WidgetResolver.resolve(element) (lib/src/resolver/widget_resolver.dart:1)
+      │         ├─ SourceResolver.location → _location → lib/ normalize
+      │         ├─ BoundsExtractor.rect → RenderBox.localToGlobal
+      │         ├─ HierarchyExtractor.path → filter _ + noisy, cap 20
+      │         ├─ TextExtractor.text → Text.data / textSpan.toPlainText
+      │         └─ KeyResolver.keyOf → widget.key.toString()
+      ├─ FeedbackPopup 300×120 black (lib/src/annotation/feedback_popup.dart:1)
+      │    └─ TextField (white on black, onSubmitted → history.add)
+      ├─ HoverHighlight (blue #3B82F6 1.5px + badge) — agentation_overlay.dart:117
+      ├─ SelectionHighlight (primary solid) — lib/src/overlay/selection_highlight.dart:1
+      └─ HistorySheet (black ListView) — agentation_overlay.dart:45
 ```
 
-Field optionality mirrors `architecture.md:3.3` — many fields `T?`; tests cover both present/absent (`spec.md: acceptance: graceful when source unavailable`).
-
-### Example pipeline with a real widget
+### Example pipeline
 
 ```text
-Tap at (32, 540) on ElevatedButton
-  → SelectionEngine finds Element<ElevatedButton> + RenderParagraph/RenderButton
-  → WidgetResolver:
-       widgetType: "ElevatedButton"
-       source: "lib/screens/home.dart:143:12"  (or null in release)
-       bounds: Rect.fromLTWH(32, 540, 320, 52)
-       hierarchy: [Scaffold, Column, Card, ElevatedButton]
-       text: "Get Started"
-  → ContextCollector: ContextModel{ facts: {...}, intent: "Make this more rounded + taller" }
-  → MarkdownExporter: deterministic Markdown per spec.md:134-175
-  → Clipboard.setData
+Hover at Button center (120×60) inside Card 200×200
+ → candidates: Card 40000, Button InkWell 7200, Text 1600 → non-Text smallest is InkWell 7200 → best = InkWell
+ → lift check: best is not Text, so keep InkWell → resolve → WidgetFacts(hierarchy filtered to Scaffold→Card→ElevatedButton)
+ → hovered border blue at InkWell rect
+
+Tap → selected = ElevatedButton element (lifted from Text leaf) → pendingPopupFor → FeedbackPopup
+→ type "Make more rounded" + Enter → history.add(facts, note) → id 1
+→ Copy (1) → exportAll([ctx1]) → Markdown with ## Annotation 1 → Clipboard
 ```
 
 ---
 
-## Route / Screen Map
+## Route / Screen Map — Overlay Chrome (black theme ADR-017)
 
-This is **not a routed app** — the tool is an **overlay package**. The host app keeps its own `go_router`/navigation. Agentation adds:
+| Chrome | Location | Purpose | Color | When visible |
+|--------|----------|---------|-------|--------------|
+| CircleToggle | bottom-right 24,24 SafeArea, draggable 40dp | Entry, shows count badge | `Colors.black` bg, `Colors.white` icon | Always when collapsed |
+| PillToolbar | bottom-right 24,24 SafeArea, fixed (not draggable) | Copy(n)/Clear/Pause/Visibility/History/Close | `Colors.black` bg, `Colors.white` icons/text | When `isExpanded` |
+| Hover border | `Positioned` at `hovered.bounds` | Blue #3B82F6 1.5px + badge indigo | `Color(0xFF3B82F6)` 0.6 border, 0.06 fill, white badge | `isEnabled && isVisible && !isPaused && hovered != null` |
+| Selected highlight | same Positioned | Solid primary border | `colorScheme.primary` 1.5px | `selected != null` |
+| FeedbackPopup | `Positioned` left `x+w+12` or flipped, top `y` | Black input `Say what…` + Add/Cancel, `Enter` creates | `Colors.black` surface, white 70 hint, white border | `pendingPopupFor != null` |
+| History sheet | `showModalBottomSheet` black | List `id • widgetType • note` + delete per row | `Colors.black` bg, white text, white 24 divider | On History tap |
 
-| Surface | Location | Purpose | When visible |
-|---------|----------|---------|--------------|
-| Activation control | overlay chrome (FAB / edge handle / keyboard shortcut) | Enable/disable inspection | Always (compact) |
-| Selection indicator | overlay canvas | Clear boundary around selected widget | Inspection on + selection present |
-| Info panel | overlay bottom sheet / side panel | Widget type, source, bounds, hierarchy, runtime properties | Selection present |
-| Feedback field | inside info panel | Developer textual note (`spec.md:FR-008`) | Selection present |
-| Copy CTA | inside info panel | Copy generated Markdown (`spec.md:FR-011`) | Context ready |
-| Visual evidence | inside info panel | Screenshot thumbnail if available (`spec.md:FR-009`) | Optional |
-
-No new app routes are introduced by V1; `flow.md` for navigation is **not applicable**. See `design-statement.md:30-58` for required panel contents.
+No app routes added; overlay is via `MaterialApp.builder`.
 
 ---
 
-## State Flow (tool UI)
+## State Flow
 
-1. **Activation**: `AgenationController.inspectionEnabled: ValueNotifier<bool>` — disables hit handling when `false` (`architecture.md:3.1`).
-2. **Selection**: `selectedElement: ValueNotifier<Element?>` set by `SelectionEngine`; `selectedRect: Rect?`.
-3. **Resolution**: synchronous derivation — `WidgetInfo` + `SourceLocation?` + `Rect?` + `HierarchyPath`.
-4. **Collector**: builds `ContextModel` (immutable) from selection facts + `AnnotationManager.value`.
-5. **Exporter**: pure function `ContextModel → Markdown` (no widget); stability tested via golden snapshots.
-6. **External**: developer copies → external agent edits source → agent diff reviewed in Git (`decisions.md:Decision 008/011`).
+1. **Entry**: `isEnabled` false → circle 40dp black/white at `right:24,bottom:24`; tap → `isEnabled true + isExpanded true` → pill.
+2. **Drag**: circle `GestureDetector.onPanUpdate` → `_dragOffset` → `_autoDock()` to 12px peek at nearest edge; pill is not draggable (handle is logo only) to avoid button conflict.
+3. **Hover**: `MouseRegion.onHover` → `controller.onHover(position)` → `engine.hoverAt` (smallest-area) → `hovered` notifier → blue border; `onExit` → `clearHover`.
+4. **Select**: `Listener.onPointerDown` → `controller.selectAt` → `selected` + `pendingPopupFor` → black popup; `Enter` or `Add` → `history.add` → `hovered`/`pending` cleared, `Copy(n)` badge updates.
+5. **History**: `history.entries` `ValueNotifier<List>` → pill badge + sheet + `exportAll`.
+6. **External**: `Copy` → `Clipboard` → external agent → Git diff.
+
+---
 
 ## API / Export Contract
 
 | Artifact | Producer | Consumer | Format |
 |----------|----------|----------|--------|
-| Markdown | `MarkdownExporter.export(model)` | Clipboard → external agent (human paste) | `spec.md:134-175`, `architecture.md:166-195` — deterministic, agent-stable |
-| JSON | `JsonExporter.toJson(model)` | Internal + future MCP (`architecture.md:83-311`) | Same ContextModel, machine-readable |
-| Screenshot | `ScreenshotService.capture()` (optional) | Embedded reference in Markdown | `spec.md:FR-009` — must not block selection if unavailable |
-
----
+| Markdown single | `MarkdownExporter.export(model)` | Clipboard (single) | `## Target/Source/Geometry/Hierarchy/Runtime/Feedback/Visual Evidence` deterministic |
+| Markdown all | `MarkdownExporter.exportAll(models)` | Clipboard (history) | `## Annotation 1` + `## Annotation 2` … per `history.toContextModels()` |
+| JSON | `JsonExporter.toJson(model)` | V3 MCP | same `ContextModel` |
 
 ## Update Protocol (MANDATORY)
 
-Update this file when **any** of the following change:
-
-- [ ] New/renamed/removed module (`overlay`, `selection`, `resolver`, `collector`, `annotation`, `exporter`)
-- [ ] Call chain between modules changed
-- [ ] New user flow or change to existing (e.g., V2 override step)
+Update this file when:
+- [ ] New/renamed/removed overlay chrome (circle/pill/hover/popup/history)
+- [ ] Call chain between `SelectionEngine`/`WidgetResolver`/`History` changed
+- [ ] New user flow (e.g., text selection, area, multi-select)
 - [ ] New agent/MCP method or export field
-- [ ] State management choice for overlay controller
-- [ ] New platform-specific adapter or behavior
+- [ ] State management for `isExpanded/isPaused/isVisible`
+- [ ] Draggable position logic or theme (black/white/blue) changed
 
-Keep Mermaid diagrams in sync with `lib/src/` — a stale diagram is worse than none.
+Keep Mermaid in sync with `lib/src/` — stale diagram is worse than none.

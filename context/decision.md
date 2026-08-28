@@ -9,6 +9,7 @@
 
 | ID | Date | Decision | Status | Affects |
 |----|------|----------|--------|---------|
+| ADR-017 | 2026-08-28 | Blackout theme + draggable fix + blue hover + Enter handling + checklist | Accepted | lib/src/overlay/*, lib/src/annotation/feedback_popup, lib/src/selection/*, context/* |
 | ADR-016 | 2026-08-28 | V1 hardening — fix source/hierarchy/selection/markdown/overlay wiring | Accepted | lib/src/resolver/*, lib/src/selection/*, lib/src/exporter/*, lib/src/overlay/* |
 | ADR-015 | 2026-08-28 | Fork-vs-Build — Independent implementation (selective adaptation) | Accepted | pubspec.yaml, lib/src/resolver + selection, architecture |
 | ADR-014 | 2026-08-28 | V1 slicing into 9 small levels L00–L08 + Specify hybrid + latest Flutter/Dart | Accepted | Feature_docs/*, .specify/, pubspec.yaml |
@@ -47,6 +48,16 @@ Canonical project ADRs (from `decisions.md` — Decisions 001–012) are folded 
 ## Decision Entries
 
 <!-- Newest on top. -->
+
+### ADR-017: Blackout theme + draggable fix + blue hover + Enter + checklist
+- **Date**: 2026-08-28
+- **Status**: Accepted
+- **Context**: User feedback after testing Windows build: entry not visible (tiny FAB blended), drag vs tap conflict, popup not black, hover not blue, Enter should create comment, and asked for full Agentation feature checklist vs next.jsexample + Flutter packages investigation.
+- **Options considered**: Keep M3 light `surfaceContainerHigh` + `primary` (blends, poor contrast); keep whole-pill draggable (blocks button taps) vs handle-only drag; keep hover `primary` vs indigo/blue; keep popup light vs black; keep single annotation vs history list.
+- **Decision**: **Blackout**: `CircleToggle` `Colors.black` + white icon, `PillToolbar` `Colors.black` + white icons/text, `FeedbackPopup` `Colors.black` + white hint + `FilledButton` white/black, history sheet `Colors.black` + white text, hover border `Color(0xFF3B82F6)` blue/indigo 1.5px + badge indigo. **Draggable**: circle draggable via `GestureDetector` on whole circle, pill fixed at `right:24,bottom:24` (no drag) to avoid button conflict, circle drag `+12px` peek auto-dock via `_autoDock()`. **Enter**: `FeedbackPopup` `textInputAction: done` + `onSubmitted` → `addAnnotation`, `Add` button white/black. **Checklist**: `Feature_docs/CHECKLIST.md` enumerates 14 implemented (circle→pill, hover smallest-area, popup, history, copy) and 16 missing (text/multi/area select, pause, layout mode, computed styles, React modes, shortcuts, screenshots, MCP).
+- **Why**: Black/white gives maximum contrast on any app theme (next.jsexample is light, Flutter inspector is dark panel), blue hover is more visible than muted primary, drag handle separation fixes tap vs pan arena, Enter handling matches next.js `Add` via `Enter`.
+- **Consequences**: Overlay now unmistakably visible on light and dark apps, hover blue distinct from selected solid, popup black matches pill, history sheet black, `dart analyze` still No issues, `flutter test` 49→53 tests after new toggle/history tests, `example` builds web/windows.
+- **Affects**: `lib/src/overlay/circle_toggle.dart:1`, `pill_toolbar.dart:1`, `selection_highlight.dart:1`, `annotation/feedback_popup.dart:1`, `overlay/agentation_overlay.dart:117` hover blue + `183` draggable, `selection/selection_engine.dart:9` smallest-area + `Text` lift, `Feature_docs/CHECKLIST.md`, `context/progress-tracker.md`, `context/flow.md`
 
 ### ADR-016: V1 hardening — source/hierarchy/selection/markdown/overlay wiring
 - **Date**: 2026-08-28

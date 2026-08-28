@@ -13,7 +13,6 @@ class CircleToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Semantics(
       label: 'Open Agentation',
       button: true,
@@ -21,10 +20,10 @@ class CircleToggle extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Material(
-            color: scheme.primary,
+            color: Colors.black,
             shape: const CircleBorder(),
-            elevation: 6,
-            shadowColor: Colors.black26,
+            elevation: 8,
+            shadowColor: Colors.black54,
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: onTap,
@@ -42,14 +41,14 @@ class CircleToggle extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: scheme.error,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(color: Colors.black, width: 1.5),
                 ),
                 child: Text(
                   '$count',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onError,
+                        color: Colors.black,
                         fontWeight: FontWeight.w700,
                         fontSize: 10,
                       ),
