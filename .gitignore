@@ -1,9 +1,54 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+build/
+*.lock
+pubspec.lock
+
+# Generated code — never commit generated sources (use `build_runner` locally)
+*.freezed.dart
+*.g.dart
+*.gr.dart
+*.freezed.dart
+*.config.dart
+*.gen.dart
+l10n/generated/
+lib/l10n/*.dart
+
+# Very good analysis / coverage
+coverage/
+test/coverage/
+lcov.info
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.dart_tool/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Spec Kit / Specify
+.specify/memory/*.md
+!specify/memory/constitution.md
+
+# Environment
+.env
+.env.local
 node_modules/
 .next/
 dist/
-build/
-.env
-.env.local
-*.log
-.DS_Store
-Thumbs.db
+
+# Agent folders (credentials risk)
+.opencode/auth.json
+.opencode/credentials.json

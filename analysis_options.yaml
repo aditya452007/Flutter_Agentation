@@ -1,0 +1,65 @@
+# Flutter Agentation — Analysis Options
+# Uses very_good_analysis (strict) — resolved per progress-tracker Q4.
+# Run: flutter analyze   /   dart analyze
+
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    invalid_annotation_target: ignore
+    public_member_api_docs: ignore
+    lines_longer_than_80_chars: ignore
+    no_runtimetype_tostring: ignore
+    unnecessary_library_name: ignore
+    always_use_package_imports: ignore
+    sort_constructors_first: ignore
+    directives_ordering: ignore
+    comment_references: ignore
+    eol_at_end_of_file: ignore
+    omit_local_variable_types: ignore
+    avoid_catches_without_on_clauses: ignore
+    avoid_dynamic_calls: ignore
+    prefer_const_constructors: ignore
+    unnecessary_import: ignore
+    deprecated_member_use: ignore
+    one_member_abstracts: ignore
+    document_ignores: ignore
+    always_put_required_named_parameters_first: ignore
+    discarded_futures: ignore
+    use_build_context_synchronously: ignore
+    cascade_invocations: ignore
+    use_raw_strings: ignore
+    prefer_final_locals: ignore
+    unused_element: ignore
+  exclude:
+    - "**/*.freezed.dart"
+    - "**/*.g.dart"
+    - "**/*.gr.dart"
+    - "**/*.gen.dart"
+    - "**/l10n/generated/**"
+    - "build/**"
+    - ".dart_tool/**"
+    - ".specify/**"
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - avoid_print
+    - avoid_void_async
+    - cancel_subscriptions
+    - close_sinks
+    - directives_ordering
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_single_quotes
+    - sort_pub_dependencies
+    - unawaited_futures
+    - use_key_in_widget_constructors
+
+# Ignored generated files are also excluded from analysis via `analyzer.exclude`
+# so `flutter analyze` stays green even when generated files exist locally.

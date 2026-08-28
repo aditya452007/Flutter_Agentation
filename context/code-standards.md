@@ -1,80 +1,97 @@
-# Code Standards
+# Code Standards — Flutter Agentation (Dart/Flutter)
 
 ## General
 
-- Keep components small and single-purpose (max ~300 lines)
-- Fix root causes — do not layer workarounds
-- Do not mix unrelated concerns in one component or route
-- Never use `npm install --force` or `npx install --force` — resolve dependency conflicts properly
-- Never default to a single UI library — mix and match from DESIGN.md
+- Keep widgets and classes small and single-purpose — **max ~300 lines per file**, **max ~80 lines per `build` method** — extract sub-widgets.
+- Fix root causes — do not layer workarounds.
+- Separation is the rule: runtime inspection vs presentation, facts vs intent vs visual, host app vs overlay (`build-instructions.md:140-151`).
+- Every feature must directly support `selection → context → Markdown`; no speculative V2/V3 behavior (`decisions.md:D-012`).
+- Never use `flutter pub add` with `dependency_overrides` to silence conflicts — resolve version constraints properly.
+- Minimal dependencies: "Do not introduce a large external dependency merely because it already implements part of the feature" (`build-instructions.md:06`).
 
-## TypeScript
+## Dart — Strict & Safe
 
-- Strict mode is required throughout the project
-- Avoid `any` — use explicit interfaces or narrowly scoped types
-- Validate unknown external input at system boundaries
-- Prefer `interface` over `type` for object shapes; use `type` for unions, intersections, and aliases
+- **Lint**: `analysis_options.yaml` with `package:flutter_lints/flutter.yaml` or `package:very_good_analysis/very_good_analysis.yaml`. **Zero `info`/`warning` on CI**; format before each commit (`build-instructions.md:181-188`).
+- **No `dynamic` at boundaries** — validate via `freezed`/`json_serializable` or sealed classes; debug/source strings are `String?`.
+- **Null safety throughout** — no `!` without a preceding check/`assert`; use `?` + early return; missing source/bounds is `T?`, not a throw.
+- Prefer `final` over `var`; `const` constructors wherever possible (`prefer_const_constructors`).
+- Naming: `lowerCamelCase` for vars/functions, `UpperCamelCase` for types. File names `snake_case.dart`.
 
-## Framework
+## Flutter Framework — Inspector Rules
 
-- Default to server components — add `'use client'` only when browser interactivity requires it
-- Use framework-native image/image optimization components
-- Keep route handlers focused on a single responsibility
-- Every page gets metadata/SEO (title, description, Open Graph tags)
+- Prefer **stateless + notifiers** for the overlay (e.g., `ValueNotifier<bool> selected`) — avoid pulling in a state-management framework unless a seam truly needs it (`build-instructions.md:155`).
+- **Reuse Flutter's inspection infra** — `Element`, `Widget`, `RenderObject`, `RenderBox.hitTest`/`BoxHitTestResult`, `WidgetInspector` — do not reimplement hit-testing (`architecture.md:87-93`, `decisions.md:D-001`).
+- Overlay is **non-destructive**: when disabled, host app behavior is identical to not wrapping with `AgenationOverlay` — no global `Builder` darts, no permanent `Listener` that swallows gestures.
+- Source location is `SourceLocation?` — UI and exporter both handle `null` via an `UnavailableLabel` / "Source unavailable" branch (`spec.md:FR-005`, `architecture.md:40-55`).
+- Handle all panel states: loading/resolving, resolved, source unavailable, no selection, copy success/failure, screenshot unavailable — map to `States.md` where applicable.
 
-## Frontend — Feature-First Organization
+## Project Layout — Package, Not a Studio App
 
-- **Every feature is a self-contained module** in `src/features/<feature-name>/`
-- Feature modules own: `api/`, `components/`, `hooks/`, `types/`, and `index.ts`
-- **No cross-feature imports** — if two features need shared code, promote to `entities/` or `shared/`
-- **Public API via `index.ts`** — external code imports only from the feature root
-- **`app/` pages are thin composition layers** — they import from features, not contain business logic
-- **`shared/` is business-agnostic** — no feature-specific code
-- **`shared/ui/`** contains primitives (Button, Modal, Input) — no business names
-- **Promote to `shared/` only on second use** — avoid premature abstraction
+Agenation is a **package** consumed by a host app, with an `example/` demo:
 
-## Backend — Service-Repository Pattern
+```
+lib/
+├── agentation.dart             # public barrel — only this is the package API
+├── src/
+│   ├── overlay/                # AgentationOverlay, highlight, panel
+│   ├── selection/              # SelectionEngine (hit-testing, adapters)
+│   ├── resolver/               # WidgetResolver, SourceResolver, BoundsExtractor, HierarchyExtractor
+│   ├── context/                # ContextModel (facts/intent/visual stub), ContextCollector
+│   ├── annotation/             # AnnotationManager, DeveloperNote
+│   ├── exporter/               # MarkdownExporter, JsonExporter, Clipboard
+│   └── core/                   # interfaces, platform adapters, SourceLocation, Rect helpers
+example/
+├── lib/main.dart               # minimal demo app (multiple widget types + nested — acceptance requires it)
+test/
+├── resolver_test.dart          # source available / unavailable, bounds, hierarchy
+├── context_collector_test.dart
+├── exporter_test.dart          # Markdown stability snapshots
+└── overlay_golden_test.dart
+```
 
-- **Controllers** handle HTTP: parse request, validate, call service, format response
-- **Services** contain business logic: orchestration, rules, workflows
-- **Repositories** handle data access: DB queries, external API calls
-- **Validators** define request schemas (Zod, Yup)
-- **Middleware** handles cross-cutting concerns: auth, rate limiting, logging
+- **Public API via `lib/agentation.dart` only** — consumers never import `lib/src/*`. Every internal module is private.
+- **No flat `lib/components/` or `lib/utils/`** — group by pipeline stage (`lib/src/resolver/`, etc.).
+- **No cross-pipeline imports that skip the model** — resolver/coller do not directly call exporter; collector produces the model, exporter consumes it — one direction (`architecture.md:83-311`).
 
-## Styling
+## Exporter Stability
 
-- Use CSS custom property tokens — no hardcoded color values
-- Follow the design token / spacing scale defined in `ui-context.md`
-- Keep utility classes inline; avoid preprocessor features like `@apply`
+- `MarkdownExporter.export(ContextModel)` is a **pure, deterministic function** — same model always produces byte-identical Markdown (tested via snapshots). Field order, line breaks, and section headings must not drift (`architecture.md:196-198`).
+- Sections: `Target / Source / Geometry / Hierarchy / Runtime Details / Developer Feedback / Visual Evidence` — follow `spec.md:134-175` but adapt after reconnaissance if Flutter APIs constrain fields.
+- JSON is a straight serialization of the same model for future MCP — never a second inspection path.
+
+## Styling (Overlay UI)
+
+- No hardcoded colors/spacing — all via `ThemeData`, `ColorScheme`, `ThemeExtension` + spacing constants in `lib/src/core/spacing.dart` or `Gap`.
+- Overlay tokens centralized in `lib/src/overlay/tokens.dart`.
 
 ## Animation
 
-- Animate only `transform` and `opacity` — never layout properties
-- Never animate from `scale(0)` — start from `scale(0.95)` with `opacity: 0`
-- Never use `ease-in` for UI animations — use `ease-out` with custom cubic-bezier
-- UI animations stay under 300ms
-- Respect `prefers-reduced-motion` on every animated element
+- Prefer implicit animations (`AnimatedContainer`/`Opacity`/`Switcher`/`Positioned`) and `flutter_animate` only if a list/stagger is needed.
+- Never animate layout properties via `setState` loops — use `AnimationController` + `Transform`/`Opacity`.
+- Durations micro 150 / standard 250 / entrance 300; `Curves.easeOutCubic`; respect `MediaQuery.disableAnimations`.
 
-## File Organization
+## Testing
 
-```
-src/
-├── app/                          # Next.js routes and layouts
-├── features/                     # Feature modules (api/, components/, hooks/, types/, index.ts)
-├── shared/                       # Shared UI, hooks, lib, api client, types
-├── entities/                     # Domain models (user, product, organization)
-├── lib/                          # Infrastructure (api-client, query-client, logger)
-├── config/                       # Runtime config, env vars, constants
-└── styles/                       # Global styles, design tokens
-```
+- **Unit**: widget resolution (available/unavailable source), bounds (including zero-size), hierarchy bounds capping, annotation, exporter stability, JSON round-trip — `architecture.md:31-40`.
+- **Widget/golden**: overlay highlight alignment at various device sizes; golden for panel layout.
+- **Integration**: via `example/` — representative app (multiple types + nesting), not only synthetic units.
+- Minimum for V1 acceptance (`spec.md:Acceptance Test`): selecting multiple widget types + nested + source when available + bounds + hierarchy + feedback + Markdown + copy + graceful unavailable.
 
-## Pre-Commit Checks (Every Feature Unit)
+## Pre-Commit Checks (every work unit) — `build-instructions.md:Git Workflow`
 
-1. Lint passes (e.g., `npm run lint`)
-2. Typecheck passes (e.g., `npm run typecheck`)
-3. Build passes (e.g., `npm run build`)
-4. `progress-tracker.md` is updated with completed work
-5. All animations have `prefers-reduced-motion` fallbacks
-6. No hardcoded colors — all values use CSS custom properties
-7. No `components/` dumping ground — code is organized by feature
-8. No cross-feature imports — shared code is properly promoted
+1. `dart format .`
+2. `flutter analyze` — zero issues
+3. `flutter test` — all relevant tests pass (include exporter snapshot)
+4. Inspect `git diff` — no `build/`, `.dart_tool/`, `*.freezed.dart`/`*.g.dart` surprises, no secrets
+5. `context/progress-tracker.md` updated
+6. No hardcoded colors — all via Theme/ColorScheme
+7. No speculative V2/V3 code beyond declared seams
+8. Fork-vs-build assessment stays current if any reused code is introduced
+
+## Prohibited Practices
+
+- No AI/LLM SDK, no MCP server, no network calls, no Dart source mutation in V1 (`spec.md:FR-012/013`, `decisions.md:D-002`).
+- No full design-mode UI (move/resize/color editor) in V1 (`design-statement.md:116-120`).
+- No persistent design-history system — use Git; only in-memory undo/redo stub for V2 seam if any (`decisions.md:D-008`).
+- No copying large portions of Flan/Pintap/Flan_flutter/DevTools without a documented reason (`build-instructions.md:Code Quality`).
+- No `import 'package:agentation/src/...'` from consumers — barrel only.

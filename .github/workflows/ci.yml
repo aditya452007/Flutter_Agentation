@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Pub get (root)
+        run: flutter pub get
+
+      - name: Analyze (root)
+        run: flutter analyze
+
+      - name: Pub get (example)
+        working-directory: example
+        run: flutter pub get
+
+      - name: Analyze (example)
+        working-directory: example
+        run: flutter analyze
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: analyze
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test --reporter=expanded
+
+      - name: Pub get (example)
+        working-directory: example
+        run: flutter pub get
+
+      # example has no unit tests after cleanup, but verify it analyzes
+      - name: Check example tests exist
+        working-directory: example
+        run: |
+          if [ -d test ] && [ "$(ls -A test)" ]; then
+            flutter test
+          else
+            echo "No example tests — skipping"
+          fi
+        shell: bash
+
+  build-web:
+    name: Build Web (example)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Enable web
+        run: flutter config --enable-web
+
+      - name: Pub get (example)
+        working-directory: example
+        run: flutter pub get
+
+      - name: Build web
+        working-directory: example
+        run: flutter build web --no-pub
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-web
+          path: example/build/web
+          retention-days: 7
+
+  build-windows:
+    name: Build Windows (example)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+
+      - name: Enable windows
+        run: flutter config --enable-windows-desktop
+
+      - name: Pub get (example)
+        working-directory: example
+        run: flutter pub get
+
+      - name: Build Windows
+        working-directory: example
+        run: flutter build windows --no-pub
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-windows
+          path: example/build/windows/x64/runner/Release
+          retention-days: 7
+
+  # Optional: verify formatting
+  # format:
+  #   name: Format
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: subosito/flutter-action@v2
+  #       with:
+  #         flutter-version: "3.44.9"
+  #         channel: stable
+  #     - run: dart format --set-exit-if-changed lib test example

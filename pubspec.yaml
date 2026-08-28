@@ -1,0 +1,21 @@
+name: flutter_agnetation
+description: Flutter Agentation — visual inspection and context-generation tool for Flutter (V1 Inspect Mode). No AI, no MCP, no visual editing in V1.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.12.2 <4.0.0"
+  flutter: ">=3.44.9"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: ^7.0.0
+
+flutter:
+  uses-material-design: true
