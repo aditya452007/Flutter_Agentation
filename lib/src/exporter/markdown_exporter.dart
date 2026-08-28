@@ -85,6 +85,18 @@ class MarkdownExporter {
     return buf.toString();
   }
 
+  String exportAll(List<ContextModel> models, {bool screenshotAvailable = false}) {
+    if (models.isEmpty) return export(const ContextModel(facts: WidgetFacts(widgetType: 'none', runtimeTypeName: 'none')), screenshotAvailable: screenshotAvailable);
+    final out = StringBuffer();
+    for (var i = 0; i < models.length; i++) {
+      out.writeln('## Annotation ${i + 1}');
+      out.writeln();
+      out.write(export(models[i], screenshotAvailable: screenshotAvailable));
+      if (i != models.length - 1) out.writeln('\n---\n');
+    }
+    return out.toString();
+  }
+
   String _escapeNote(String note) {
     // Escape fence + heading so note cannot break Markdown structure
     var out = note.replaceAll('```', '\\`\\`\\`');

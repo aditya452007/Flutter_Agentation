@@ -1,6 +1,8 @@
 // Flutter Agentation — public barrel.
+export 'src/annotation/annotation_history.dart';
 export 'src/annotation/annotation_manager.dart';
 export 'src/annotation/feedback_field.dart';
+export 'src/annotation/feedback_popup.dart';
 export 'src/context/context_model.dart';
 export 'src/context/geometry.dart';
 export 'src/context/source_location.dart';
@@ -11,7 +13,9 @@ export 'src/exporter/markdown_exporter.dart';
 export 'src/exporter/widgets/copy_button.dart';
 export 'src/overlay/agentation_controller.dart';
 export 'src/overlay/agentation_overlay.dart';
+export 'src/overlay/circle_toggle.dart';
 export 'src/overlay/info_panel.dart';
+export 'src/overlay/pill_toolbar.dart';
 export 'src/overlay/selection_highlight.dart';
 export 'src/overlay/tokens.dart';
 export 'src/resolver/widget_resolver.dart';

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_agnetation/src/overlay/activation_toggle.dart';
 import 'package:flutter_agnetation/src/overlay/agentation_overlay.dart';
+import 'package:flutter_agnetation/src/overlay/circle_toggle.dart';
+import 'package:flutter_agnetation/src/overlay/pill_toolbar.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -40,12 +42,12 @@ void main() {
           ),
         ),
       );
-      // Toggle must be present even without selection
-      expect(find.text('Agentation'), findsOneWidget);
-      expect(find.byType(ActivationToggle), findsOneWidget);
+      // Initially only circle is visible
+      expect(find.byType(CircleToggle), findsOneWidget);
+      expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
     });
 
-    testWidgets('shows highlight + panel after selection', (t) async {
+    testWidgets('circle expands to pill and shows only input popup on select', (t) async {
       await t.pumpWidget(
         MaterialApp(
           home: AgentationOverlay.wrap(
@@ -55,19 +57,20 @@ void main() {
           ),
         ),
       );
-      // Initially no highlight
       expect(find.text('tapMe'), findsOneWidget);
-      // Enable inspection
-      await t.tap(find.text('Agentation'));
+      // Tap circle to expand + enable inspect
+      await t.tap(find.byType(CircleToggle));
       await t.pumpAndSettle();
-      expect(find.text('Inspecting…'), findsOneWidget);
-      // Tap the button via global position
+      expect(find.byType(PillToolbar), findsOneWidget);
+      expect(find.textContaining('Copy'), findsOneWidget);
+      // Tap the button via global position — should show only FeedbackPopup input
       final center = t.getCenter(find.text('tapMe'));
       await t.tapAt(center);
       await t.pumpAndSettle();
-      // Highlight label should appear (widgetType or hierarchy)
-      // At least the info panel should be visible with Widget section
-      expect(find.textContaining('Widget'), findsWidgets);
+      expect(find.text('Say what to change…'), findsOneWidget);
+      expect(find.text('Add'), findsOneWidget);
+      // Full hierarchy should NOT be in popup — only in copied markdown
+      expect(find.textContaining('Hierarchy'), findsNothing);
     });
   });
 }
