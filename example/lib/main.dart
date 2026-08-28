@@ -8,19 +8,18 @@ class DemoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AgentationOverlay.wrap(
-      child: MaterialApp(
-        title: 'Agenation Demo',
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
-        ),
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const HomeScreen(),
-          '/details': (context) => const DetailsScreen(),
-        },
+    return MaterialApp(
+      title: 'Agenation Demo',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
       ),
+      builder: (context, child) => AgentationOverlay.wrap(child: child!),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/details': (context) => const DetailsScreen(),
+      },
     );
   }
 }

@@ -33,18 +33,18 @@ class HierarchyTree extends StatelessWidget {
             padding: EdgeInsets.only(left: i * 8),
             child: Row(
               children: [
-                Text(
-                  '└── ${path[i]}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        fontWeight: i == path.length - 1 ? FontWeight.bold : null,
-                        color: i == path.length - 1 ? Theme.of(context).colorScheme.primary : null,
-                      ),
+                Expanded(
+                  child: Text(
+                    '└── ${path[i]}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          fontWeight: i == path.length - 1 ? FontWeight.bold : null,
+                          color: i == path.length - 1 ? Theme.of(context).colorScheme.primary : null,
+                        ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                if (i == path.length - 1) ...[
-                  const SizedBox(width: 4),
-                  const Text('◄'),
-                ],
+                if (i == path.length - 1) const Text('◄'),
               ],
             ),
           ),

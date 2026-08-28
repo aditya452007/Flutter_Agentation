@@ -35,6 +35,7 @@ analyzer:
     use_raw_strings: ignore
     prefer_final_locals: ignore
     unused_element: ignore
+    prefer_int_literals: ignore
   exclude:
     - "**/*.freezed.dart"
     - "**/*.g.dart"

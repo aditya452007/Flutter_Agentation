@@ -16,10 +16,11 @@ class SelectionHighlight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (bounds == null) {
-      // No bounds — show badge only anchored to top-left? For now badge only.
-      return Align(
-        alignment: Alignment.topLeft,
-        child: _Badge(label: label),
+      return IgnorePointer(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: _Badge(label: label),
+        ),
       );
     }
     final media = MediaQuery.maybeOf(context);
@@ -29,24 +30,26 @@ class SelectionHighlight extends StatelessWidget {
       top: bounds!.y,
       width: bounds!.width,
       height: bounds!.height,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).colorScheme.primary,
-                width: AgentationTokens.strokeWidth,
+      child: IgnorePointer(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: AgentationTokens.strokeWidth,
+                ),
+                borderRadius: BorderRadius.circular(6),
               ),
-              borderRadius: BorderRadius.circular(6),
             ),
-          ),
-          Positioned(
-            top: -20,
-            left: 0,
-            child: _Badge(label: label),
-          ),
-        ],
+            Positioned(
+              top: -20,
+              left: 0,
+              child: _Badge(label: label),
+            ),
+          ],
+        ),
       ),
     );
     if (disableAnimations) return position;
@@ -57,24 +60,26 @@ class SelectionHighlight extends StatelessWidget {
       top: bounds!.y,
       width: bounds!.width,
       height: bounds!.height,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).colorScheme.primary,
-                width: AgentationTokens.strokeWidth,
+      child: IgnorePointer(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: AgentationTokens.strokeWidth,
+                ),
+                borderRadius: BorderRadius.circular(6),
               ),
-              borderRadius: BorderRadius.circular(6),
             ),
-          ),
-          Positioned(
-            top: -20,
-            left: 0,
-            child: _Badge(label: label),
-          ),
-        ],
+            Positioned(
+              top: -20,
+              left: 0,
+              child: _Badge(label: label),
+            ),
+          ],
+        ),
       ),
     );
   }

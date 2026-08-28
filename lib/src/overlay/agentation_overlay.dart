@@ -64,7 +64,9 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    // Ensure Directionality even if overlay wraps MaterialApp (outside)
+    final directionality = Directionality.maybeOf(context);
+    final stack = Stack(
       children: [
         Listener(
           behavior: _controller.isEnabled.value
@@ -78,11 +80,9 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
           child: widget.child,
         ),
         if (_controller.isEnabled.value && _controller.selected.value != null)
-          IgnorePointer(
-            child: SelectionHighlight(
-              bounds: _controller.selected.value!.bounds,
-              label: _controller.selected.value!.facts.widgetType,
-            ),
+          SelectionHighlight(
+            bounds: _controller.selected.value!.bounds,
+            label: _controller.selected.value!.facts.widgetType,
           ),
         if (_controller.isEnabled.value && _controller.selected.value != null)
           Positioned(
@@ -151,6 +151,10 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
         ),
       ],
     );
+    if (directionality == null) {
+      return Directionality(textDirection: TextDirection.ltr, child: stack);
+    }
+    return stack;
   }
 
   @override
