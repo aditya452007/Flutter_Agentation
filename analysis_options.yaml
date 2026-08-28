@@ -37,6 +37,7 @@ analyzer:
     unused_element: ignore
     prefer_int_literals: ignore
     unused_local_variable: ignore
+    avoid_redundant_argument_values: ignore
   exclude:
     - "**/*.freezed.dart"
     - "**/*.g.dart"
