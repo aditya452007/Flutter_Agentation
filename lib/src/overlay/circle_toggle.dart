@@ -20,17 +20,19 @@ class CircleToggle extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Material(
-            color: Colors.black,
+            color: const Color(0xCC0A0A0A),
             shape: const CircleBorder(),
-            elevation: 8,
-            shadowColor: Colors.black54,
+            elevation: 2,
+            shadowColor: const Color(0x0D000000),
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: onTap,
+              hoverColor: const Color(0x14FFFFFF),
+              highlightColor: const Color(0x1FFFFFFF),
               child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(Icons.smart_toy_outlined, size: 20, color: Colors.white),
+                width: 48,
+                height: 48,
+                child: Icon(Icons.smart_toy_outlined, size: 20, color: Color(0xFFF5F0EB)),
               ),
             ),
           ),

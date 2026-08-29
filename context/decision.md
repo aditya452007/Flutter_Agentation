@@ -9,6 +9,7 @@
 
 | ID | Date | Decision | Status | Affects |
 |----|------|----------|--------|---------|
+| ADR-018 | 2026-08-28 | Distortion fix + premium polish (throttle, centered glass pill, charcoal) | Proposed | lib/src/overlay/*, lib/src/selection/*, context/flow.md |
 | ADR-017 | 2026-08-28 | Blackout theme + draggable fix + blue hover + Enter handling + checklist | Accepted | lib/src/overlay/*, lib/src/annotation/feedback_popup, lib/src/selection/*, context/* |
 | ADR-016 | 2026-08-28 | V1 hardening — fix source/hierarchy/selection/markdown/overlay wiring | Accepted | lib/src/resolver/*, lib/src/selection/*, lib/src/exporter/*, lib/src/overlay/* |
 | ADR-015 | 2026-08-28 | Fork-vs-Build — Independent implementation (selective adaptation) | Accepted | pubspec.yaml, lib/src/resolver + selection, architecture |
@@ -48,6 +49,16 @@ Canonical project ADRs (from `decisions.md` — Decisions 001–012) are folded 
 ## Decision Entries
 
 <!-- Newest on top. -->
+
+### ADR-018: Distortion fix + premium polish (throttle, centered glass pill, charcoal) — Proposed
+- **Date**: 2026-08-28
+- **Status**: Proposed — awaiting your approval on ASCII + premium tokens before coding
+- **Context**: After R10 blackout, manual testing showed pill distorts covering entire screen when hovering Pause (i), and overall chrome feels not premium (pure black #000 harsh, no blur, no stagger, pill 390dp > 320dp overflow). Parallel agents (`Task` tool ×3) pinpointed 6 root causes with file:line evidence (see `Feature_docs/CHECKLIST_R10_POLISH.md`).
+- **Options considered**: Keep harsh black + instant swap + O(N) hover every pixel (current) vs **throttled 16ms + smallest-area + chrome exclusion + centered glass pill with charcoal #0A0A0A 72% + blur 16 + shadow-lg + 8px grid + stagger 40ms*i + 44×44 touch targets** (premium `premium-design/SKILL.md` Modern Minimalist + Glass).
+- **Decision**: Propose to (1) throttle hover 16ms + isolate via `ValueListenableBuilder(hovered)` + exclude `AgentationOverlay/PillToolbar/CircleToggle` from `SelectionEngine` walk + 80% screen area cap, (2) center pill `Align(bottomCenter) + ConstrainedBox(maxWidth: min(560, screenW-32)) + SafeArea 16` + `ClipRRect 16` + `BackdropFilter blur 16` + `Row` groups `gap:8`/`gap:16` + `VerticalDivider 0.08`, (3) replace pure black with `charcoal #0A0A0A` + `cream #F5F0EB` + `indigo #6366F1` tokens, `shadowSm/Md`, `micro 150ms easeStandard cubic(0.4,0,0.2,1)`, `AnimatedSwitcher` 220ms morph + `AnimatedContainer` 40→240, (4) fix Pause white-on-white by giving each `IconButton` own `Material` + `shape:CircleBorder` so `Ink` not hosted by outer pill `Material`. See ASCII in `context/flow.md` for current vs desired.
+- **Why**: `premium-design/SKILL.md:79` Restraint + `color-theory.md:16` never pure white on pure black + `layout-spacing.md:8px Grid` + `SKILL.md:520` 44×44 + `interaction-design.md:150ms` + Next.js Agentation centered toolbar with 4 groups (Hick/Miller) vs our 1 flat Row. Distortion 1-4 all trace to `agentation_overlay.dart:36` full `Stack` rebuild + `pill_toolbar.dart:36` overflow + `selection_engine.dart:91` chrome included.
+- **Consequences**: Hover will be 60fps smooth, pill will not overflow on 320dp, hover over Pause will show 36×36 blue border on button not pill wash, premium feel via glass + stagger + subtle shadows, `dart analyze` stays No issues, `flutter test` adds 2 throttle/center tests.
+- **Affects**: `lib/src/overlay/tokens.dart:17` (expand tokens), `lib/src/overlay/circle_toggle.dart:23` (48×48 + charcoal), `lib/src/overlay/pill_toolbar.dart:31` (glass + centered), `lib/src/overlay/agentation_overlay.dart:36` (throttle + isolate + center), `lib/src/selection/selection_engine.dart:91` (exclude chrome + cap)
 
 ### ADR-017: Blackout theme + draggable fix + blue hover + Enter + checklist
 - **Date**: 2026-08-28

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 /// Expanded pill toolbar — full Next.js-like controls: Copy, Clear, Pause, Visibility, History.
@@ -28,19 +29,22 @@ class PillToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xCC0A0A0A), // charcoal 80% for glassmorphism premium
+      color: Colors.transparent,
       elevation: 0,
       shadowColor: Colors.transparent,
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0x14FFFFFF), width: 1),
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: SingleChildScrollView(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xCC0A0A0A),
+              border: Border.all(color: const Color(0x14FFFFFF), width: 1),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             child: Row(
@@ -134,7 +138,8 @@ class PillToolbar extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

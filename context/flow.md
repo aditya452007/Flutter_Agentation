@@ -257,6 +257,60 @@ Tap → selected = ElevatedButton element (lifted from Text leaf) → pendingPop
 
 No app routes added; overlay is via `MaterialApp.builder`.
 
+### Pill Layout — Current vs Desired (ASCII — why pill distorts)
+
+**Current (bottom-right monolithic pill, flat Row, pure black #000, no blur, 390dp > 320dp overflow):**
+```
+Viewport 390 x 844
+┌─────────────────────────────────────────┐
+│  App Card 200x200                      │
+│   ┌────────────────────┐               │
+│   │  ElevatedButton ◄─┼─ hover blue   │  ← highlight under pill hidden
+│   └────────────────────┘  #3B82F6 1.5 │
+│                                         │
+│                     ┌───────────────────────────────────────┐ RIGHT+24 BOTTOM+24
+│                     │ ◉  Copy(2) Clear │ ⏸ 👁 ⧉(2) ✕  │◄─ Single Row, divider 1px
+│                     └───────────────────────────────────────┘   radius 28, 0xCC0A0A0A, scroll
+│                     └─ SingleChildScrollView overflow on 320dp  no blur, 36dp targets
+└─────────────────────────────────────────┘
+```
+*Evidence:* `lib/src/overlay/pill_toolbar.dart:36` Row 390dp, `lib/src/overlay/agentation_overlay.dart:222` `Positioned(right:24,bottom:24)` loose constraints, `withOpacity(0.08)` hard.
+
+**Desired (bottom-center grouped glass, charcoal, 8px grid, stagger — premium Modern Minimalist):**
+```
+Viewport 390 x 844
+┌─────────────────────────────────────────┐
+│  App — no occlusion                    │
+│   ┌────────────────────┐               │
+│   │  ElevatedButton ◄─┼─ hover blue   │  ← always visible above toolbar
+│   └────────────────────┘               │
+│           ┌── Centered bottom ── 16 ──┐ │  ← Align(bottomCenter) + SafeArea
+│           │  Backdrop blur 16 + 0.72  │ │     ConstrainedBox max 560, gap 8/16
+│           │ ┌─────┐ ┌──────────────┐ ┌─┴─┐ ┌─────────────────┐ ┌─────┐│
+│           │ │ ⋮⋮ ◉│ │ Copy(2) ●  │ │ ⏸ │ │ 👁  ⧉  │ │▭ L │ │ ✕ ││
+│           │ │ drag│ │ primary CTA │ │   │ │ toggle group │ │Layout│ │close││
+│           │ └─────┘ └──────────────┘ └─┬─┘ └─────────────────┘ └─────┘│
+│           └──────────┴────────┴───────┴─────┴───────────────────────┘│
+│                Group A   Group B     Group C     Group D         E  │   blur lets content shine
+└─────────────────────────────────────────┘  shadow-lg 0 8px 32px rgba(0,0,0,.12) + border 0.08
+```
+`lib/src/overlay/tokens.dart:17` `charcoal #0A0A0A` + `cream #F5F0EB` + `indigo #6366F1`, `shadowSm/Md`, `micro 150ms easeStandard cubic(0.4,0,0.2,1)`, `AnimatedSwitcher` 220ms morph `40→240` + stagger `40ms*i`, `44×44` touch targets.
+
+---
+
+## Visual Tool — Missing (vs Next.js Agentation)
+
+| Next.js Feature | Flutter Gap | File |
+|---|---|---|
+| Layout Mode `L` + palette 65+ drag-to-place | No `isLayoutMode`, `visual_changes.dart` empty | `lib/src/visual/layout_controller.dart` (new) |
+| Rearrange (grab section) | No `onPan` on highlight | `lib/src/overlay/selection_highlight.dart:6` |
+| Wireframe + opacity slider + purpose | No `WireframeOverlay` | `lib/src/overlay/wireframe_overlay.dart` (new) |
+| Text / Area / Multi-select (green 1) | Only single `selectAt` | `lib/src/selection/selection_engine.dart:27` |
+| Computed styles collapsible | `WidgetFacts.properties` always null | `lib/src/resolver/computed_style_extractor.dart` (new) |
+| Screenshots | `screenshotAvailable` always false | `lib/src/exporter/screenshot_service.dart` (new) |
+
+See `Feature_docs/CHECKLIST.md:24` + `Feature_docs/CHECKLIST_V2.md:6` for full 16 missing.
+
 ---
 
 ## State Flow

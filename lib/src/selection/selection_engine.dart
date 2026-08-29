@@ -23,9 +23,12 @@ class SelectionEngine extends ChangeNotifier {
   final ValueNotifier<SelectionResult?> selected = ValueNotifier<SelectionResult?>(null);
   final ValueNotifier<SelectionResult?> hovered = ValueNotifier<SelectionResult?>(null);
 
-  /// Hit-tests at [globalOffset] and updates [selected].
+  bool _isChrome(String type) =>
+      type.contains('Agentation') || type.contains('PillToolbar') || type.contains('CircleToggle') || type.contains('FeedbackPopup') || type.contains('SelectionHighlight') || type.contains('Hover');
+
+  /// Hit-tests at [globalOffset] and updates [selected] — uses hitTestInView when available.
   SelectionResult? selectAt(Offset globalOffset) {
-    _hitTest.hitTest(globalOffset);
+    _hitTestInView(globalOffset);
     final target = _bestCandidate(globalOffset);
     if (target == null) {
       selected.value = null;
@@ -40,8 +43,9 @@ class SelectionEngine extends ChangeNotifier {
     return selection;
   }
 
-  /// Updates hovered (not selected) for mouse move. No-op on touch.
+  /// Updates hovered (not selected) for mouse move — throttled in overlay.
   SelectionResult? hoverAt(Offset globalOffset) {
+    _hitTestInView(globalOffset);
     final target = _bestCandidate(globalOffset);
     if (target == null) {
       if (hovered.value != null) {
@@ -50,7 +54,6 @@ class SelectionEngine extends ChangeNotifier {
       }
       return null;
     }
-    // Avoid churn: same element as before
     if (hovered.value?.element == target) return hovered.value;
     final facts = _resolver.resolve(target);
     final rect = _bounds.rect(target);
@@ -58,6 +61,23 @@ class SelectionEngine extends ChangeNotifier {
     hovered.value = result;
     notifyListeners();
     return result;
+  }
+
+  void _hitTestInView(Offset globalOffset) {
+    try {
+      final binding = WidgetsBinding.instance;
+      final viewId = binding.platformDispatcher.views.first.viewId;
+      final result = HitTestResult();
+      // ignore: deprecated_member_use, reason: hitTestInView requires viewId, fallback to hitTest if not available
+      try {
+        // ignore: avoid_dynamic_calls
+        (binding as dynamic).hitTestInView(result, globalOffset, viewId);
+      } catch (_) {
+        _hitTest.hitTest(globalOffset);
+      }
+    } catch (_) {
+      _hitTest.hitTest(globalOffset);
+    }
   }
 
   void clearHover() {
@@ -88,23 +108,39 @@ class SelectionEngine extends ChangeNotifier {
     return true;
   }
 
+  double? _screenArea() {
+    try {
+      final view = WidgetsBinding.instance.platformDispatcher.views.first;
+      return view.physicalSize.width * view.physicalSize.height / (view.devicePixelRatio * view.devicePixelRatio);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Element? _bestCandidate(Offset globalOffset) {
     final root = WidgetsBinding.instance.rootElement;
     if (root == null) return null;
     final candidates = <({Element element, double area})>[];
+    final screenArea = _screenArea();
 
     void walk(Element element) {
+      final type = element.widget.runtimeType.toString();
+      if (_isChrome(type)) {
+        // Skip overlay chrome entirely (circle, pill, popup, highlight)
+        return;
+      }
       final ro = element.renderObject;
       if (ro is RenderBox && ro.hasSize && ro.attached && ro is! RenderView) {
         try {
           final global = ro.localToGlobal(Offset.zero);
           final rect = global & ro.size;
           if (rect.contains(globalOffset)) {
-            final type = element.widget.runtimeType.toString();
             if (_isRelevant(type)) {
               final area = ro.size.width * ro.size.height;
-              // Filter overly large background (e.g., Scaffold 800x600) unless no smaller candidate?
-              // Keep all, smallest-area will naturally prefer smaller.
+              // Area cap 80% screen — ignore huge background unless no smaller
+              if (screenArea != null && area > screenArea * 0.8) {
+                // keep as fallback but deprioritize — add with large area, will be last after sort
+              }
               candidates.add((element: element, area: area));
             }
           }
@@ -115,9 +151,14 @@ class SelectionEngine extends ChangeNotifier {
 
     walk(root);
     if (candidates.isEmpty) return null;
+    // Filter out huge background if smaller candidates exist
+    final filteredByArea = screenArea != null
+        ? candidates.where((c) => c.area <= screenArea * 0.8).toList()
+        : candidates;
+    final areaPool = filteredByArea.isNotEmpty ? filteredByArea : candidates;
     // Prefer smallest-area among non-Text candidates; fall back to Text if only Texts hit
-    final nonText = candidates.where((c) => !_isLeafText(c.element.widget.runtimeType.toString())).toList();
-    final pool = nonText.isNotEmpty ? nonText : candidates;
+    final nonText = areaPool.where((c) => !_isLeafText(c.element.widget.runtimeType.toString())).toList();
+    final pool = nonText.isNotEmpty ? nonText : areaPool;
     pool.sort((a, b) => a.area.compareTo(b.area));
     final best = pool.first.element;
     // Lift Text leaf to button-like ancestor if best is Text and a nearby non-Text ancestor also contains point

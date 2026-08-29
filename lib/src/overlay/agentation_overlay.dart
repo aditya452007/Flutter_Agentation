@@ -5,6 +5,7 @@ import 'package:flutter_agnetation/src/overlay/agentation_controller.dart';
 import 'package:flutter_agnetation/src/overlay/circle_toggle.dart';
 import 'package:flutter_agnetation/src/overlay/pill_toolbar.dart';
 import 'package:flutter_agnetation/src/overlay/selection_highlight.dart';
+import 'package:flutter_agnetation/src/selection/selection_result.dart';
 
 /// Wraps an app and inserts Agentation chrome — circle → pill, hover, popup, history.
 class AgentationOverlay extends StatefulWidget {
@@ -127,46 +128,62 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
             child: widget.child,
           ),
         ),
-        // Hover border — indigo/blue 1.5px solid + badge (more visible per reference docs)
-        if (isEnabled && isVisible && !isPaused && hovered != null && hovered.bounds != null && hovered.element != selected?.element)
-          Positioned(
-            left: hovered.bounds!.x,
-            top: hovered.bounds!.y,
-            width: hovered.bounds!.width,
-            height: hovered.bounds!.height,
-            child: IgnorePointer(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
-                      borderRadius: BorderRadius.circular(6),
-                      color: const Color(0xFF3B82F6).withOpacity(0.08),
-                    ),
-                  ),
-                  Positioned(
-                    top: -16,
-                    left: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        // Hover border — isolated via ValueListenableBuilder to avoid full Stack rebuild
+        ValueListenableBuilder<SelectionResult?>(
+          valueListenable: _controller.hovered,
+          builder: (context, hovered, _) {
+            final selected = _controller.selected.value;
+            final isVisible = _controller.isVisible.value;
+            final isPaused = _controller.isPaused.value;
+            final isEnabled = _controller.isEnabled.value;
+            if (!isEnabled || !isVisible || isPaused || hovered == null || hovered.bounds == null || hovered.element == selected?.element) {
+              return const SizedBox.shrink();
+            }
+            return Positioned(
+              left: hovered.bounds!.x,
+              top: hovered.bounds!.y,
+              width: hovered.bounds!.width,
+              height: hovered.bounds!.height,
+              child: IgnorePointer(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6),
+                        border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
                         borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        hovered.facts.widgetType,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                        color: const Color(0xFF3B82F6).withOpacity(0.08),
                       ),
                     ),
-                  ),
-                ],
+                    Positioned(
+                      top: -16,
+                      left: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          hovered.facts.widgetType,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-        // Selected highlight (solid)
-        if (isEnabled && isVisible && selected != null && selected.bounds != null)
-          SelectionHighlight(bounds: selected.bounds, label: selected.facts.widgetType),
+            );
+          },
+        ),
+        // Selected highlight — isolated
+        ValueListenableBuilder<SelectionResult?>(
+          valueListenable: _controller.selected,
+          builder: (context, selected, _) {
+            if (!isEnabled || !isVisible || selected == null || selected.bounds == null) return const SizedBox.shrink();
+            return SelectionHighlight(bounds: selected.bounds, label: selected.facts.widgetType);
+          },
+        ),
         // Feedback popup anchored to pending selection
         if (pending != null && pending.bounds != null)
           Positioned(
@@ -217,12 +234,20 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
             },
           );
 
-    // Pill is not draggable (buttons must not be mistaken for drag) — only circle is draggable
+    // Pill is centered bottom, not draggable (handle only) — premium centered glass
     if (isExpanded) {
-      return Positioned(
-        right: 24,
-        bottom: 24,
-        child: SafeArea(child: toggle),
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: SafeArea(
+          minimum: const EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width < 560 ? MediaQuery.of(context).size.width - 32 : 560),
+              child: toggle,
+            ),
+          ),
+        ),
       );
     }
 
