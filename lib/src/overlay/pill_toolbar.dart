@@ -28,78 +28,111 @@ class PillToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black,
-      elevation: 8,
-      shadowColor: Colors.black54,
+      color: const Color(0xCC0A0A0A), // charcoal 80% for glassmorphism premium
+      elevation: 0,
+      shadowColor: Colors.transparent,
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Logo + collapse — drag handle
-          InkWell(
-            onTap: onCollapse,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0x14FFFFFF), width: 1),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Logo + collapse — drag handle
+                InkWell(
+                  onTap: onCollapse,
+                  hoverColor: const Color(0x14FFFFFF),
+                  highlightColor: const Color(0x1FFFFFFF),
+                  customBorder: const CircleBorder(),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF5F0EB),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.smart_toy_outlined, size: 16, color: Color(0xFF0A0A0A)),
+                    ),
+                  ),
                 ),
-                child: const Icon(Icons.smart_toy_outlined, size: 16, color: Colors.black),
-              ),
+                const SizedBox(width: 4),
+                _PillButton(
+                  icon: Icons.content_copy_rounded,
+                  label: 'Copy ($count)',
+                  enabled: count > 0,
+                  onTap: onCopy,
+                ),
+                _PillButton(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Clear',
+                  enabled: count > 0,
+                  onTap: onClear,
+                ),
+                Container(width: 1, height: 24, color: const Color(0x14FFFFFF), margin: const EdgeInsets.symmetric(horizontal: 4)),
+                IconButton(
+                  tooltip: isPaused ? 'Resume' : 'Pause',
+                  icon: Icon(isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 18),
+                  onPressed: onTogglePause,
+                  style: IconButton.styleFrom(
+                    backgroundColor: isPaused ? const Color(0xFFF5F0EB) : Colors.transparent,
+                    foregroundColor: isPaused ? const Color(0xFF0A0A0A) : Colors.white,
+                    overlayColor: const Color(0x14FFFFFF),
+                    minimumSize: const Size(36, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                IconButton(
+                  tooltip: isVisible ? 'Hide markers' : 'Show markers',
+                  icon: Icon(isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 18, color: Colors.white),
+                  onPressed: onToggleVisibility,
+                  style: IconButton.styleFrom(
+                    overlayColor: const Color(0x14FFFFFF),
+                    minimumSize: const Size(36, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'History',
+                  icon: Badge(
+                    label: count > 0 ? Text('$count') : null,
+                    isLabelVisible: count > 0,
+                    backgroundColor: const Color(0xFFF5F0EB),
+                    textColor: const Color(0xFF0A0A0A),
+                    child: const Icon(Icons.history_rounded, size: 18, color: Colors.white),
+                  ),
+                  onPressed: onHistory,
+                  style: IconButton.styleFrom(
+                    overlayColor: const Color(0x14FFFFFF),
+                    minimumSize: const Size(36, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'Collapse',
+                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
+                  onPressed: onCollapse,
+                  style: IconButton.styleFrom(
+                    overlayColor: const Color(0x14FFFFFF),
+                    minimumSize: const Size(36, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
             ),
           ),
-          const SizedBox(width: 4),
-          // Copy
-          _PillButton(
-            icon: Icons.content_copy_rounded,
-            label: 'Copy ($count)',
-            enabled: count > 0,
-            onTap: onCopy,
-          ),
-          _PillButton(
-            icon: Icons.delete_outline_rounded,
-            label: 'Clear',
-            enabled: count > 0,
-            onTap: onClear,
-          ),
-          Container(width: 1, height: 24, color: Colors.white24, margin: const EdgeInsets.symmetric(horizontal: 4)),
-          IconButton(
-            tooltip: isPaused ? 'Resume' : 'Pause',
-            icon: Icon(isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 18, color: Colors.white),
-            onPressed: onTogglePause,
-            style: IconButton.styleFrom(
-              backgroundColor: isPaused ? Colors.white : Colors.transparent,
-              foregroundColor: isPaused ? Colors.black : Colors.white,
-            ),
-          ),
-          IconButton(
-            tooltip: isVisible ? 'Hide markers' : 'Show markers',
-            icon: Icon(isVisible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 18, color: Colors.white),
-            onPressed: onToggleVisibility,
-          ),
-          IconButton(
-            tooltip: 'History',
-            icon: Badge(
-              label: count > 0 ? Text('$count') : null,
-              isLabelVisible: count > 0,
-              backgroundColor: Colors.white,
-              textColor: Colors.black,
-              child: const Icon(Icons.history_rounded, size: 18, color: Colors.white),
-            ),
-            onPressed: onHistory,
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: 'Collapse',
-            icon: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
-            onPressed: onCollapse,
-          ),
-          const SizedBox(width: 6),
-        ],
+        ),
       ),
     );
   }

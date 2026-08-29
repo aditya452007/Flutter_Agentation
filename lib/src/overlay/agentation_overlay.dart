@@ -24,6 +24,7 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
   late final AgentationController _controller;
   bool _ownsController = false;
   Offset? _dragOffset; // null = default bottom-right
+  int _lastHoverMs = 0;
 
   @override
   void initState() {
@@ -104,12 +105,19 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
     final isPaused = _controller.isPaused.value;
     final isVisible = _controller.isVisible.value;
 
-    // Main stack
+    // Main stack — hover is throttled 16ms and isolated via ValueListenableBuilder
     final stack = Stack(
       children: [
-        // App content with hover + tap handling
+        // App content with hover + tap handling (throttled)
         MouseRegion(
-          onHover: isEnabled && !isPaused ? (e) => _controller.onHover(e.position) : null,
+          onHover: isEnabled && !isPaused
+              ? (e) {
+                  final now = DateTime.now().millisecondsSinceEpoch;
+                  if (now - _lastHoverMs < 16) return;
+                  _lastHoverMs = now;
+                  _controller.onHover(e.position);
+                }
+              : null,
           onExit: (_) => _controller.clearHover(),
           child: Listener(
             behavior: isEnabled ? HitTestBehavior.translucent : HitTestBehavior.deferToChild,
