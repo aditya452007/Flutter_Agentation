@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_agnetation/src/annotation/feedback_popup.dart';
+import 'package:flutter_agnetation/src/context/geometry.dart';
 import 'package:flutter_agnetation/src/exporter/clipboard_service.dart';
 import 'package:flutter_agnetation/src/overlay/agentation_controller.dart';
 import 'package:flutter_agnetation/src/overlay/circle_toggle.dart';
+import 'package:flutter_agnetation/src/overlay/layout_palette.dart';
 import 'package:flutter_agnetation/src/overlay/pill_toolbar.dart';
 import 'package:flutter_agnetation/src/overlay/selection_highlight.dart';
+import 'package:flutter_agnetation/src/overlay/wireframe_overlay.dart';
+import 'package:flutter_agnetation/src/visual/palette_model.dart';
 import 'package:flutter_agnetation/src/selection/selection_result.dart';
 
 /// Wraps an app and inserts Agentation chrome — circle → pill, hover, popup, history.
@@ -24,7 +29,7 @@ class AgentationOverlay extends StatefulWidget {
 class _AgentationOverlayState extends State<AgentationOverlay> {
   late final AgentationController _controller;
   bool _ownsController = false;
-  Offset? _dragOffset; // null = default bottom-right
+  Offset? _dragOffset;
   int _lastHoverMs = 0;
 
   @override
@@ -99,109 +104,228 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
     final directionality = Directionality.maybeOf(context);
     final isEnabled = _controller.isEnabled.value;
     final isExpanded = _controller.isExpanded.value;
-    final hovered = _controller.hovered.value;
-    final selected = _controller.selected.value;
     final pending = _controller.pendingPopupFor.value;
     final count = _controller.history.entries.value.length;
     final isPaused = _controller.isPaused.value;
     final isVisible = _controller.isVisible.value;
+    final isLayoutMode = _controller.isLayoutMode.value;
+    final wireframeOpacity = _controller.layout.wireframeOpacity.value;
+    final placements = _controller.layout.placements.value;
 
-    // Main stack — hover is throttled 16ms and isolated via ValueListenableBuilder
-    final stack = Stack(
-      children: [
-        // App content with hover + tap handling (throttled)
-        MouseRegion(
-          onHover: isEnabled && !isPaused
-              ? (e) {
-                  final now = DateTime.now().millisecondsSinceEpoch;
-                  if (now - _lastHoverMs < 16) return;
-                  _lastHoverMs = now;
-                  _controller.onHover(e.position);
-                }
-              : null,
-          onExit: (_) => _controller.clearHover(),
-          child: Listener(
-            behavior: isEnabled ? HitTestBehavior.translucent : HitTestBehavior.deferToChild,
-            onPointerDown: isEnabled && !isPaused
-                ? (event) => _controller.selectAt(event.position)
-                : null,
-            child: widget.child,
-          ),
-        ),
-        // Hover border — isolated via ValueListenableBuilder to avoid full Stack rebuild
-        ValueListenableBuilder<SelectionResult?>(
-          valueListenable: _controller.hovered,
-          builder: (context, hovered, _) {
-            final selected = _controller.selected.value;
-            final isVisible = _controller.isVisible.value;
-            final isPaused = _controller.isPaused.value;
-            final isEnabled = _controller.isEnabled.value;
-            if (!isEnabled || !isVisible || isPaused || hovered == null || hovered.bounds == null || hovered.element == selected?.element) {
-              return const SizedBox.shrink();
-            }
-            return Positioned(
-              left: hovered.bounds!.x,
-              top: hovered.bounds!.y,
-              width: hovered.bounds!.width,
-              height: hovered.bounds!.height,
-              child: IgnorePointer(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
+    final stack = Shortcuts(
+      shortcuts: <LogicalKeySet, Intent>{
+        LogicalKeySet(LogicalKeyboardKey.keyL): VoidCallbackIntent(() => _controller.toggleLayout()),
+        LogicalKeySet(LogicalKeyboardKey.escape): VoidCallbackIntent(() {
+          if (_controller.pendingPopupFor.value != null) {
+            _controller.cancelPopup();
+          } else if (isLayoutMode) {
+            _controller.toggleLayout();
+          } else if (isExpanded) {
+            _controller.collapse();
+          }
+        }),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          VoidCallbackIntent: CallbackAction<VoidCallbackIntent>(onInvoke: (i) => i.callback()),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Stack(
+            children: [
+              WireframeOverlay(
+                opacity: isLayoutMode ? wireframeOpacity : 0,
+                child: DragTarget<PaletteItem>(
+                  onAcceptWithDetails: (details) {
+                    final box = context.findRenderObject() as RenderBox?;
+                    if (box == null) return;
+                    final size = box.size;
+                    final local = box.globalToLocal(details.offset);
+                    final relative = Rect.fromLTWH(
+                      (local.dx / size.width * 100).clamp(0, 100).toDouble(),
+                      (local.dy / size.height * 100).clamp(0, 100).toDouble(),
+                      30,
+                      20,
+                    );
+                    _controller.layout.addPlacement(
+                      details.data.type,
+                      RectInfo(x: relative.left, y: relative.top, width: relative.width, height: relative.height),
+                    );
+                  },
+                  builder: (context, candidate, rejected) => MouseRegion(
+                    onHover: isEnabled && !isPaused && !isLayoutMode
+                        ? (e) {
+                            final now = DateTime.now().millisecondsSinceEpoch;
+                            if (now - _lastHoverMs < 16) return;
+                            _lastHoverMs = now;
+                            _controller.onHover(e.position);
+                          }
+                        : null,
+                    onExit: (_) => _controller.clearHover(),
+                    child: Listener(
+                      behavior: isEnabled ? HitTestBehavior.translucent : HitTestBehavior.deferToChild,
+                      onPointerDown: isEnabled && !isPaused && !isLayoutMode
+                          ? (event) => _controller.selectAt(event.position)
+                          : null,
+                      child: widget.child,
+                    ),
+                  ),
+                ),
+              ),
+              ...placements.map(
+                (p) => Positioned(
+                  left: MediaQuery.of(context).size.width * p.relativeRect.x / 100,
+                  top: MediaQuery.of(context).size.height * p.relativeRect.y / 100,
+                  width: MediaQuery.of(context).size.width * p.relativeRect.width / 100,
+                  height: MediaQuery.of(context).size.height * p.relativeRect.height / 100,
+                  child: IgnorePointer(
+                    child: Container(
                       decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+                        border: Border.all(color: const Color(0xFF6366F1), width: 1.5, strokeAlign: BorderSide.strokeAlignInside),
                         borderRadius: BorderRadius.circular(6),
-                        color: const Color(0xFF3B82F6).withOpacity(0.08),
+                        color: const Color(0xFF6366F1).withOpacity(0.08),
                       ),
+                      child: Center(child: Text(p.componentType, style: const TextStyle(color: Color(0xFF6366F1), fontSize: 10, fontWeight: FontWeight.w600))),
                     ),
-                    Positioned(
-                      top: -16,
-                      left: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3B82F6),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          hovered.facts.widgetType,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            );
-          },
-        ),
-        // Selected highlight — isolated
-        ValueListenableBuilder<SelectionResult?>(
-          valueListenable: _controller.selected,
-          builder: (context, selected, _) {
-            if (!isEnabled || !isVisible || selected == null || selected.bounds == null) return const SizedBox.shrink();
-            return SelectionHighlight(bounds: selected.bounds, label: selected.facts.widgetType);
-          },
-        ),
-        // Feedback popup anchored to pending selection
-        if (pending != null && pending.bounds != null)
-          Positioned(
-            left: _popupLeft(pending, context),
-            top: _popupTop(pending, context),
-            child: SafeArea(
-              child: SizedBox(
-                width: 300,
-                child: FeedbackPopup(
-                  onAdd: (note) => _controller.addAnnotation(note),
-                  onCancel: () => _controller.cancelPopup(),
-                ),
+              ValueListenableBuilder<SelectionResult?>(
+                valueListenable: _controller.hovered,
+                builder: (context, hovered, _) {
+                  final selected = _controller.selected.value;
+                  if (!isEnabled || !isVisible || isPaused || hovered == null || hovered.bounds == null || hovered.element == selected?.element) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: hovered.bounds!.x,
+                    top: hovered.bounds!.y,
+                    width: hovered.bounds!.width,
+                    height: hovered.bounds!.height,
+                    child: IgnorePointer(
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+                              borderRadius: BorderRadius.circular(6),
+                              color: const Color(0xFF3B82F6).withOpacity(0.08),
+                            ),
+                          ),
+                          Positioned(
+                            top: -16,
+                            left: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B82F6),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                hovered.facts.widgetType,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            ),
+              ValueListenableBuilder<SelectionResult?>(
+                valueListenable: _controller.selected,
+                builder: (context, selected, _) {
+                  if (!isEnabled || !isVisible || selected == null || selected.bounds == null) return const SizedBox.shrink();
+                  return SelectionHighlight(bounds: selected.bounds, label: selected.facts.widgetType);
+                },
+              ),
+              if (pending != null && pending.bounds != null)
+                Positioned(
+                  left: _popupLeft(pending, context),
+                  top: _popupTop(pending, context),
+                  child: SafeArea(
+                    child: SizedBox(
+                      width: 300,
+                      child: FeedbackPopup(
+                        onAdd: (note) => _controller.addAnnotation(note),
+                        onCancel: () => _controller.cancelPopup(),
+                      ),
+                    ),
+                  ),
+                ),
+              if (isLayoutMode)
+                Positioned(
+                  left: 16,
+                  top: 80,
+                  child: SafeArea(
+                    child: LayoutPalette(onClose: () => _controller.toggleLayout()),
+                  ),
+                ),
+              if (isLayoutMode)
+                Positioned(
+                  left: 16,
+                  top: 500,
+                  child: SafeArea(
+                    child: Material(
+                      color: const Color(0xCC0A0A0A),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 300,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.layers_outlined, color: Colors.white, size: 16),
+                                  const SizedBox(width: 8),
+                                  const Text('Wireframe', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const Spacer(),
+                                  Text('${(wireframeOpacity * 100).round()}%', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                                ],
+                              ),
+                              Slider(
+                                value: wireframeOpacity,
+                                min: 0,
+                                max: 1,
+                                activeColor: const Color(0xFF6366F1),
+                                inactiveColor: Colors.white24,
+                                onChanged: (v) => _controller.layout.setWireframeOpacity(v),
+                              ),
+                              TextField(
+                                decoration: const InputDecoration(
+                                  hintText: 'Purpose (e.g. landing hero)',
+                                  hintStyle: TextStyle(color: Colors.white54, fontSize: 11),
+                                  filled: true,
+                                  fillColor: Color(0x14FFFFFF),
+                                  border: OutlineInputBorder(borderSide: BorderSide(color: Color(0x14FFFFFF))),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                                onChanged: (v) => _controller.layout.setPurpose(v),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              _buildDraggableToggle(
+                isEnabled: isEnabled,
+                isExpanded: isExpanded,
+                count: count,
+                isPaused: isPaused,
+                isVisible: isVisible,
+                isLayoutMode: isLayoutMode,
+              ),
+            ],
           ),
-        // Draggable circle / pill at bottom-right or dragged position
-        _buildDraggableToggle(isEnabled: isEnabled, isExpanded: isExpanded, count: count, isPaused: isPaused, isVisible: isVisible),
-      ],
+        ),
+      ),
     );
 
     if (directionality == null) {
@@ -210,17 +334,19 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
     return stack;
   }
 
-  Widget _buildDraggableToggle({required bool isEnabled, required bool isExpanded, required int count, required bool isPaused, required bool isVisible}) {
+  Widget _buildDraggableToggle({required bool isEnabled, required bool isExpanded, required int count, required bool isPaused, required bool isVisible, required bool isLayoutMode}) {
     final toggle = isExpanded
         ? PillToolbar(
             count: count,
             isPaused: isPaused,
             isVisible: isVisible,
+            isLayoutMode: isLayoutMode,
             onCopy: _handleCopy,
             onClear: () => _controller.clearHistory(),
             onTogglePause: () => _controller.togglePause(),
             onToggleVisibility: () => _controller.toggleVisibility(),
             onHistory: _showHistorySheet,
+            onToggleLayout: () => _controller.toggleLayout(),
             onCollapse: () {
               _controller.collapse();
               _controller.disable();
@@ -234,7 +360,6 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
             },
           );
 
-    // Pill is centered bottom, not draggable (handle only) — premium centered glass
     if (isExpanded) {
       return Align(
         alignment: Alignment.bottomCenter,
@@ -289,7 +414,6 @@ class _AgentationOverlayState extends State<AgentationOverlay> {
     if (_dragOffset == null) return;
     final size = MediaQuery.of(context).size;
     final dx = _dragOffset!.dx;
-    // Dock to nearest horizontal edge with 12px peek
     final isLeft = dx < size.width / 2;
     setState(() {
       _dragOffset = Offset(

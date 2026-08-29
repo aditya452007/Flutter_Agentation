@@ -1,4 +1,5 @@
 import 'package:flutter_agnetation/src/context/context_model.dart';
+import 'package:flutter_agnetation/src/context/visual_changes.dart';
 
 class MarkdownExporter {
   const MarkdownExporter();
@@ -95,6 +96,24 @@ class MarkdownExporter {
       if (i != models.length - 1) out.writeln('\n---\n');
     }
     return out.toString();
+  }
+
+  String exportVisual(List<VisualChanges> visuals) {
+    if (visuals.isEmpty) return '';
+    final buf = StringBuffer();
+    buf.writeln('## Visual Changes');
+    buf.writeln();
+    for (final v in visuals) {
+      if (v is VisualPlacement) {
+        final r = v.relativeRect;
+        buf.writeln('- Placement: ${v.componentType} at ${r.x.toStringAsFixed(1)}%,${r.y.toStringAsFixed(1)}% ${r.width.toStringAsFixed(1)}%×${r.height.toStringAsFixed(1)}%${v.purpose != null ? ' — ${v.purpose}' : ''}');
+      } else if (v is VisualWireframe) {
+        buf.writeln('- Wireframe: opacity ${v.opacity.toStringAsFixed(2)}${v.purpose != null ? ', purpose: ${v.purpose}' : ''}');
+      } else if (v is VisualRearrange) {
+        buf.writeln('- Rearrange: ${v.elementId} ${v.fromRect.width.toStringAsFixed(0)}→${v.toRect.width.toStringAsFixed(0)}');
+      }
+    }
+    return buf.toString();
   }
 
   String _escapeNote(String note) {

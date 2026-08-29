@@ -14,6 +14,8 @@ class PillToolbar extends StatelessWidget {
     required this.onCollapse,
     required this.isPaused,
     required this.isVisible,
+    this.isLayoutMode = false,
+    this.onToggleLayout,
   });
 
   final int count;
@@ -25,6 +27,8 @@ class PillToolbar extends StatelessWidget {
   final VoidCallback onCollapse;
   final bool isPaused;
   final bool isVisible;
+  final bool isLayoutMode;
+  final VoidCallback? onToggleLayout;
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +120,18 @@ class PillToolbar extends StatelessWidget {
                   ),
                   onPressed: onHistory,
                   style: IconButton.styleFrom(
+                    overlayColor: const Color(0x14FFFFFF),
+                    minimumSize: const Size(36, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                IconButton(
+                  tooltip: isLayoutMode ? 'Exit layout' : 'Layout mode (L)',
+                  icon: Icon(Icons.view_quilt_rounded, size: 18, color: isLayoutMode ? const Color(0xFF0A0A0A) : Colors.white),
+                  onPressed: onToggleLayout,
+                  style: IconButton.styleFrom(
+                    backgroundColor: isLayoutMode ? const Color(0xFFF5F0EB) : Colors.transparent,
+                    foregroundColor: isLayoutMode ? const Color(0xFF0A0A0A) : Colors.white,
                     overlayColor: const Color(0x14FFFFFF),
                     minimumSize: const Size(36, 36),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
